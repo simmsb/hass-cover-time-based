@@ -143,7 +143,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     @property
     def is_closed(self):
         """Return if the cover is closed."""
-        return self.current_cover_position <= 10
+        # can be None when is created
+        return self.current_cover_position is None or \
+               self.current_cover_position <= 10
 
     @property
     def assumed_state(self):
