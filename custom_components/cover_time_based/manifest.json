@@ -1,10 +1,13 @@
 {
   "domain": "cover_time_based",
   "name": "Switch to Time-based Cover",
-  "codeowners": ["@duhow"],
+  "codeowners": [
+    "@duhow"
+  ],
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/cover_time_based",
+  "documentation": "https://github.com/duhow/hass-cover-time-based/tree/main",
   "integration_type": "helper",
   "iot_class": "calculated",
-  "version": "0.0.2"
+  "issue_tracker": "https://github.com/duhow/hass-cover-time-based/issues",
+  "version": "0.0.3"
 }
