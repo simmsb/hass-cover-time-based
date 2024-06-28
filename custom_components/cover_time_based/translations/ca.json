@@ -1,0 +1,33 @@
+{
+  "title": "Canvia un commutador a Persiana cronometrada",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Crea una Persiana cronometrada des d'altres commutadors",
+        "description": "Escull dos interruptors, commutadors o llums i converteix-los en una Persiana a Home Assistant. Les entitats que escullis s'amagaràn.",
+        "data": {
+          "name": "Nom",
+          "up": "Pujar",
+          "down": "Baixar",
+          "time_open": "Temps per obrir la persiana",
+          "time_close": "Temps per tancar la persiana (opcional)"
+        },
+        "data_description": {
+          "name": "Nom de la nova persiana a crear.",
+          "up": "Entitat que farà l'acció de pujar.",
+          "down": "Entitat que farà l'acció de baixar."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "time_open": "Temps per obrir la persiana",
+          "time_close": "Temps per tancar la persiana (opcional)"
+        }
+      }
+    }
+  }
+}
