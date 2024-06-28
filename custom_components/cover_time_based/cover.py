@@ -31,14 +31,44 @@ from homeassistant.const import (
     SERVICE_STOP_COVER,
 )
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.event import async_track_utc_time_change, async_track_time_interval
+from homeassistant.util import slugify
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_ENTITY_UP, CONF_ENTITY_DOWN, CONF_TIME_OPEN, CONF_TIME_CLOSE
 from .travelcalculator import TravelCalculator, TravelStatus
 
 _LOGGER = logging.getLogger(__name__)
+
+async def async_get_device_entry_from_entity_id(
+    hass: HomeAssistant, entity_id: str
+) -> DeviceEntry:
+    """ Get DeviceEntry from an entity ID. """
+    ent_reg = er.async_get(hass)
+    entity_entry = ent_reg.async_get(entity_id)
+
+    if (
+        entity_entry is None
+        or entity_entry.device_id is None
+        or entity_entry.platform != DOMAIN
+    ):
+        return False
+
+    device_id = entity_entry.device_id
+
+    device_reg = dr.async_get(hass)
+    device = device_reg.async_get(device_id)
+
+    return device
+
+
+def generate_unique_id(name: str) -> str:
+    entity = f"{COVER_DOMAIN}.time_based_{name}".lower()
+    unique_id = slugify(entity)
+    return unique_id
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -58,7 +88,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             CoverTimeBased(
-                config_entry.entry_id,
+                generate_unique_id(config_entry.title),
                 config_entry.title,
                 config_entry.options.get(CONF_TIME_CLOSE),
                 config_entry.options[CONF_TIME_OPEN],
@@ -71,7 +101,7 @@ async def async_setup_entry(
 
 class CoverTimeBased(CoverEntity, RestoreEntity):
 
-    def __init__(self, device_id, name, travel_time_down, travel_time_up, open_switch_entity_id, close_switch_entity_id):
+    def __init__(self, unique_id, name, travel_time_down, travel_time_up, open_switch_entity_id, close_switch_entity_id):
         """Initialize the cover."""
         if not travel_time_down:
             travel_time_down = travel_time_up
@@ -79,11 +109,8 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         self._travel_time_up = travel_time_up
         self._open_switch_entity_id = open_switch_entity_id
         self._close_switch_entity_id = close_switch_entity_id
-
-        if name:
-            self._name = name
-        else:
-            self._name = device_id
+        self._name = name
+        self._attr_unique_id = unique_id
 
         self._unsubscribe_auto_updater = None
 
@@ -143,7 +170,6 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     @property
     def is_closed(self):
         """Return if the cover is closed."""
-        # can be None when is created
         return self.current_cover_position is None or \
                self.current_cover_position <= 10
 
@@ -162,24 +188,22 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     async def async_close_cover(self, **kwargs):
         """Turn the device close."""
         _LOGGER.debug('async_close_cover')
-        self.tc.start_travel_up()
-
-        self.start_auto_updater()
         await self._async_handle_command(SERVICE_CLOSE_COVER)
+        self.tc.start_travel_up()
+        self.start_auto_updater()
 
     async def async_open_cover(self, **kwargs):
         """Turn the device open."""
         _LOGGER.debug('async_open_cover')
-        self.tc.start_travel_down()
-
-        self.start_auto_updater()
         await self._async_handle_command(SERVICE_OPEN_COVER)
+        self.tc.start_travel_down()
+        self.start_auto_updater()
 
     async def async_stop_cover(self, **kwargs):
         """Turn the device stop."""
         _LOGGER.debug('async_stop_cover')
-        self._handle_my_button()
         await self._async_handle_command(SERVICE_STOP_COVER)
+        self._handle_my_button()
 
     async def set_position(self, position):
         _LOGGER.debug('set_position')
@@ -193,10 +217,10 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         elif position > current_position:
             command = SERVICE_OPEN_COVER
         if command is not None:
+            await self._async_handle_command(command)
             self.start_auto_updater()
             self.tc.start_travel(position)
             _LOGGER.debug('set_position :: command %s', command)
-            await self._async_handle_command(command)
         return
 
     def start_auto_updater(self):
