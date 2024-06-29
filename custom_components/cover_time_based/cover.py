@@ -9,9 +9,13 @@ from homeassistant.components.cover import ATTR_POSITION
 from homeassistant.components.cover import CoverEntity
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_ENTITY_ID
+from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.const import SERVICE_CLOSE_COVER
 from homeassistant.const import SERVICE_OPEN_COVER
 from homeassistant.const import SERVICE_STOP_COVER
+from homeassistant.const import STATE_OFF
+from homeassistant.const import STATE_ON
 from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -104,7 +108,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             travel_time_down = travel_time_up
         self._travel_time_down = travel_time_down
         self._travel_time_up = travel_time_up
+        self._open_switch_state = STATE_OFF
         self._open_switch_entity_id = open_switch_entity_id
+        self._close_switch_state = STATE_OFF
         self._close_switch_entity_id = close_switch_entity_id
         self._name = name
         self._attr_unique_id = unique_id
@@ -116,6 +122,8 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     async def async_added_to_hass(self):
         """Only cover's position matters."""
         """The rest is calculated from this attribute."""
+        # Listen to all change events, look for switch/light press
+        self.hass.bus.async_listen(EVENT_STATE_CHANGED, self._handle_state_changed)
         old_state = await self.async_get_last_state()
         _LOGGER.debug("async_added_to_hass :: oldState %s", old_state)
         if (
@@ -124,6 +132,58 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             and old_state.attributes.get(ATTR_CURRENT_POSITION) is not None
         ):
             self.tc.set_position(int(old_state.attributes.get(ATTR_CURRENT_POSITION)))
+
+    async def _handle_state_changed(self, event):
+        """Process changes in Home Assistant, look if switch is opened
+        manually."""
+        # If switch/light is not the target, skip
+        if event.data.get(ATTR_ENTITY_ID) not in [
+            self._close_switch_entity_id,
+            self._open_switch_entity_id,
+        ]:
+            return
+
+        if event.data.get("new_state") is None:
+            return
+
+        if event.data.get("old_state") is None:
+            return
+
+        if event.data.get("new_state").state == event.data.get("old_state").state:
+            return
+
+        # Target switch/light
+        if event.data.get(ATTR_ENTITY_ID) == self._close_switch_entity_id:
+            if self._close_switch_state == event.data.get("new_state").state:
+                return
+            self._close_switch_state = event.data.get("new_state").state
+        elif event.data.get(ATTR_ENTITY_ID) == self._open_switch_entity_id:
+            if self._open_switch_state == event.data.get("new_state").state:
+                return
+            self._open_switch_state = event.data.get("new_state").state
+
+        # Handle new status
+        if (
+            self._open_switch_state == STATE_OFF
+            and self._close_switch_state == STATE_OFF
+        ):
+            _LOGGER.debug(f"{self._name}: open/close: off/off, stopping")
+            return await self.async_stop_cover()
+        elif (
+            self._open_switch_state == STATE_ON and self._close_switch_state == STATE_ON
+        ):
+            _LOGGER.debug(f"{self._name}: open/close: on/on, turning off both switches")
+            return await self.async_stop_cover()
+        elif (
+            self._open_switch_state == STATE_ON
+            and self._close_switch_state == STATE_OFF
+        ):
+            await self.async_open_cover(handle_command=False)
+        elif (
+            self._open_switch_state == STATE_OFF
+            and self._close_switch_state == STATE_ON
+        ):
+            await self.async_close_cover(handle_command=False)
 
     def _handle_my_button(self):
         """Handle the MY button press."""
@@ -188,14 +248,16 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     async def async_close_cover(self, **kwargs):
         """Turn the device close."""
         _LOGGER.debug("async_close_cover")
-        await self._async_handle_command(SERVICE_CLOSE_COVER)
+        if kwargs.get("handle_command") is not False:
+            await self._async_handle_command(SERVICE_CLOSE_COVER)
         self.tc.start_travel_up()
         self.start_auto_updater()
 
     async def async_open_cover(self, **kwargs):
         """Turn the device open."""
         _LOGGER.debug("async_open_cover")
-        await self._async_handle_command(SERVICE_OPEN_COVER)
+        if kwargs.get("handle_command") is not False:
+            await self._async_handle_command(SERVICE_OPEN_COVER)
         self.tc.start_travel_down()
         self.start_auto_updater()
 
