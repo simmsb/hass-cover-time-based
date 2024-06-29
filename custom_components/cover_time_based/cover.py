@@ -265,8 +265,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             self.tc.stop()
 
     async def _async_handle_command(self, command, *args):
-        if command == "close_cover":
-            cmd = "DOWN"
+        if command == SERVICE_CLOSE_COVER:
             self._state = False
             await self.hass.services.async_call(
                 "homeassistant",
@@ -278,11 +277,10 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
                 "homeassistant",
                 "turn_on",
                 {"entity_id": self._close_switch_entity_id},
-                False,
+                True,
             )
 
-        elif command == "open_cover":
-            cmd = "UP"
+        elif command == SERVICE_OPEN_COVER:
             self._state = True
             await self.hass.services.async_call(
                 "homeassistant",
@@ -294,11 +292,10 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
                 "homeassistant",
                 "turn_on",
                 {"entity_id": self._open_switch_entity_id},
-                False,
+                True,
             )
 
-        elif command == "stop_cover":
-            cmd = "STOP"
+        elif command == SERVICE_STOP_COVER:
             self._state = True
             await self.hass.services.async_call(
                 "homeassistant",
@@ -313,7 +310,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
                 False,
             )
 
-        _LOGGER.debug("_async_handle_command :: %s", cmd)
+        _LOGGER.debug("_async_handle_command :: %s", command)
 
         # Update state of entity
         self.async_write_ha_state()
