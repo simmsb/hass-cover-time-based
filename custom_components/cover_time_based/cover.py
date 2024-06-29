@@ -3,35 +3,22 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any
 
 from homeassistant.components.cover import ATTR_CURRENT_POSITION
 from homeassistant.components.cover import ATTR_POSITION
 from homeassistant.components.cover import CoverEntity
-from homeassistant.components.cover import CoverEntityFeature
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
-from homeassistant.components.cover import PLATFORM_SCHEMA
-from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_ENTITY_ID
-from homeassistant.const import CONF_ENTITY_ID
-from homeassistant.const import CONF_NAME
 from homeassistant.const import SERVICE_CLOSE_COVER
 from homeassistant.const import SERVICE_OPEN_COVER
 from homeassistant.const import SERVICE_STOP_COVER
-from homeassistant.const import SERVICE_TURN_OFF
-from homeassistant.const import SERVICE_TURN_ON
-from homeassistant.const import STATE_ON
 from homeassistant.core import callback
-from homeassistant.core import Event
-from homeassistant.core import EventStateChangedData
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.event import async_track_utc_time_change
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import slugify
 

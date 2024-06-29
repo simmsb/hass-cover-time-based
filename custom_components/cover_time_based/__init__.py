@@ -17,8 +17,6 @@ from homeassistant.helpers.event import async_track_entity_registry_updated_even
 
 from .const import CONF_ENTITY_DOWN
 from .const import CONF_ENTITY_UP
-from .const import CONF_INVERT
-from .const import CONF_TARGET_DEVICE_CLASS
 
 _LOGGER = logging.getLogger(__name__)
 

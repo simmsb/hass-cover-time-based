@@ -5,22 +5,15 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.components.cover import CoverDeviceClass
-from homeassistant.const import CONF_ENTITY_ID
 from homeassistant.const import CONF_NAME
 from homeassistant.const import Platform
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 from homeassistant.helpers.schema_config_entry_flow import SchemaConfigFlowHandler
 from homeassistant.helpers.schema_config_entry_flow import SchemaFlowFormStep
-from homeassistant.helpers.schema_config_entry_flow import (
-    wrapped_entity_config_entry_title,
-)
 
 from .const import CONF_ENTITY_DOWN
 from .const import CONF_ENTITY_UP
-from .const import CONF_INVERT
-from .const import CONF_TARGET_DEVICE_CLASS
 from .const import CONF_TIME_CLOSE
 from .const import CONF_TIME_OPEN
 from .const import DOMAIN
