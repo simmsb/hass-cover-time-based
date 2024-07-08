@@ -16,6 +16,8 @@ from homeassistant.const import SERVICE_OPEN_COVER
 from homeassistant.const import SERVICE_STOP_COVER
 from homeassistant.const import STATE_OFF
 from homeassistant.const import STATE_ON
+from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -162,6 +164,12 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
                 return
             self._open_switch_state = event.data.get("new_state").state
 
+        # Set unavailable if any of the switches becomes unavailable
+        self._attr_available = not any(
+            self._open_switch_state == STATE_UNAVAILABLE,
+            self._close_switch_state == STATE_UNAVAILABLE,
+        )
+
         # Handle new status
         if (
             self._open_switch_state == STATE_OFF
@@ -238,9 +246,21 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         """Return True because covers can be stopped midway."""
         return True
 
+    def check_availability(self) -> bool:
+        """Check if any of the entities is unavailable and update status."""
+        for entity in [self._close_switch_entity_id, self._open_switch_entity_id]:
+            state = self.hass.states.get(entity).state
+            if state in [STATE_UNAVAILABLE, STATE_UNKNOWN]:
+                self._attr_available = False
+                return
+        self._attr_available = True
+
     async def async_set_cover_position(self, **kwargs):
         """Move the cover to a specific position."""
         if ATTR_POSITION in kwargs:
+            self.check_availability()
+            if not self.available:
+                return
             position = kwargs[ATTR_POSITION]
             _LOGGER.debug("async_set_cover_position: %d", position)
             await self.set_position(position)
@@ -248,6 +268,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     async def async_close_cover(self, **kwargs):
         """Turn the device close."""
         _LOGGER.debug("async_close_cover")
+        self.check_availability()
+        if not self.available:
+            return
         if kwargs.get("handle_command") is not False:
             await self._async_handle_command(SERVICE_CLOSE_COVER)
         self.tc.start_travel_up()
@@ -256,6 +279,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     async def async_open_cover(self, **kwargs):
         """Turn the device open."""
         _LOGGER.debug("async_open_cover")
+        self.check_availability()
+        if not self.available:
+            return
         if kwargs.get("handle_command") is not False:
             await self._async_handle_command(SERVICE_OPEN_COVER)
         self.tc.start_travel_down()
@@ -264,6 +290,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     async def async_stop_cover(self, **kwargs):
         """Turn the device stop."""
         _LOGGER.debug("async_stop_cover")
+        self.check_availability()
+        if not self.available:
+            return
         await self._async_handle_command(SERVICE_STOP_COVER)
         self._handle_my_button()
 
