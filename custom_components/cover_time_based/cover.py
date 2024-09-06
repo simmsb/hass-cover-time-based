@@ -11,6 +11,7 @@ from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.const import EVENT_STATE_CHANGED
+from homeassistant.const import Platform
 from homeassistant.const import SERVICE_CLOSE_COVER
 from homeassistant.const import SERVICE_OPEN_COVER
 from homeassistant.const import SERVICE_STOP_COVER
@@ -29,6 +30,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import slugify
 
 from .const import CONF_ENTITY_DOWN
+from .const import CONF_ENTITY_STOP
 from .const import CONF_ENTITY_UP
 from .const import CONF_TIME_CLOSE
 from .const import CONF_TIME_OPEN
@@ -80,6 +82,11 @@ async def async_setup_entry(
     entity_down = er.async_validate_entity_id(
         registry, config_entry.options[CONF_ENTITY_DOWN]
     )
+    entity_stop = None
+    if config_entry.options.get(CONF_ENTITY_STOP):
+        entity_stop = er.async_validate_entity_id(
+            registry, config_entry.options[CONF_ENTITY_STOP]
+        )
 
     async_add_entities(
         [
@@ -90,6 +97,7 @@ async def async_setup_entry(
                 config_entry.options[CONF_TIME_OPEN],
                 entity_up,
                 entity_down,
+                entity_stop,
             )
         ]
     )
@@ -104,6 +112,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         travel_time_up,
         open_switch_entity_id,
         close_switch_entity_id,
+        stop_switch_entity_id=None,
     ):
         """Initialize the cover."""
         if not travel_time_down:
@@ -114,6 +123,8 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         self._open_switch_entity_id = open_switch_entity_id
         self._close_switch_state = STATE_OFF
         self._close_switch_entity_id = close_switch_entity_id
+        self._stop_switch_state = STATE_OFF
+        self._stop_switch_entity_id = stop_switch_entity_id
         self._name = name
         self._attr_unique_id = unique_id
 
@@ -142,6 +153,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         if event.data.get(ATTR_ENTITY_ID) not in [
             self._close_switch_entity_id,
             self._open_switch_entity_id,
+            self._stop_switch_entity_id,
         ]:
             return
 
@@ -154,6 +166,13 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         if event.data.get("new_state").state == event.data.get("old_state").state:
             return
 
+        # avoid loop
+        if event.data.get(ATTR_ENTITY_ID).startswith("script."):
+            return
+
+        if event.data.get(ATTR_ENTITY_ID).startswith(f"{Platform.BUTTON}."):
+            return
+
         # Target switch/light
         if event.data.get(ATTR_ENTITY_ID) == self._close_switch_entity_id:
             if self._close_switch_state == event.data.get("new_state").state:
@@ -163,6 +182,13 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             if self._open_switch_state == event.data.get("new_state").state:
                 return
             self._open_switch_state = event.data.get("new_state").state
+        elif (
+            self.has_stop_entity
+            and event.data.get(ATTR_ENTITY_ID) == self.stop_switch_entity_id
+        ):
+            if self._stop_switch_state == event.data.get("new_state").state:
+                return
+            self._stop_switch_state = event.data.get("new_state").state
 
         # Set unavailable if any of the switches becomes unavailable
         self._attr_available = not any(
@@ -247,6 +273,11 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     def assumed_state(self):
         """Return True because covers can be stopped midway."""
         return True
+
+    @property
+    def has_stop_entity(self) -> bool:
+        """Check if there is a third input used to stop the cover."""
+        return self._stop_switch_entity_id is not None
 
     async def check_availability(self) -> None:
         """Check if any of the entities is unavailable and update status."""
@@ -357,51 +388,44 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             await self._async_handle_command(SERVICE_STOP_COVER)
             self.tc.stop()
 
+    async def set_entity(self, state: str, entity_id, wait=False):
+        if state not in [STATE_ON, STATE_OFF]:
+            raise Exception(f"calling set_entity with wrong state {state}")
+
+        domain = "homeassistant"
+        action = f"turn_{state}"
+
+        if entity_id.startswith(Platform.BUTTON):
+            domain = "input_button"
+            action = "press"
+        elif entity_id.startswith("script"):
+            domain = "script"
+
+        return await self.hass.services.async_call(
+            domain, action, {"entity_id": entity_id}, wait
+        )
+
     async def _async_handle_command(self, command, *args):
         if command == SERVICE_CLOSE_COVER:
             self._state = False
-            await self.hass.services.async_call(
-                "homeassistant",
-                "turn_off",
-                {"entity_id": self._open_switch_entity_id},
-                False,
-            )
-            await self.hass.services.async_call(
-                "homeassistant",
-                "turn_on",
-                {"entity_id": self._close_switch_entity_id},
-                True,
-            )
+            if self.has_stop_entity:
+                await self.set_entity(STATE_OFF, self._stop_switch_entity_id)
+            await self.set_entity(STATE_OFF, self._open_switch_entity_id)
+            await self.set_entity(STATE_ON, self._close_switch_entity_id, True)
 
         elif command == SERVICE_OPEN_COVER:
             self._state = True
-            await self.hass.services.async_call(
-                "homeassistant",
-                "turn_off",
-                {"entity_id": self._close_switch_entity_id},
-                False,
-            )
-            await self.hass.services.async_call(
-                "homeassistant",
-                "turn_on",
-                {"entity_id": self._open_switch_entity_id},
-                True,
-            )
+            if self.has_stop_entity:
+                await self.set_entity(STATE_OFF, self._stop_switch_entity_id)
+            await self.set_entity(STATE_OFF, self._close_switch_entity_id)
+            await self.set_entity(STATE_ON, self._open_switch_entity_id, True)
 
         elif command == SERVICE_STOP_COVER:
             self._state = True
-            await self.hass.services.async_call(
-                "homeassistant",
-                "turn_off",
-                {"entity_id": self._close_switch_entity_id},
-                False,
-            )
-            await self.hass.services.async_call(
-                "homeassistant",
-                "turn_off",
-                {"entity_id": self._open_switch_entity_id},
-                False,
-            )
+            await self.set_entity(STATE_OFF, self._close_switch_entity_id)
+            await self.set_entity(STATE_OFF, self._open_switch_entity_id)
+            if self.has_stop_entity:
+                await self.set_entity(STATE_ON, self._stop_switch_entity_id, True)
 
         _LOGGER.debug("_async_handle_command :: %s", command)
 
