@@ -107,6 +107,7 @@ async def async_setup_entry(
         f"{cover_id}_button",
         f"{config_entry.title} calibrate",
         config_entry.options[CONF_TIME_OPEN],
+        cover,
     )
 
     async_add_entities([cover, button])
