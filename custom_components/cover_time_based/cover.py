@@ -131,6 +131,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
 
         self._unsubscribe_auto_updater = None
 
+        self.is_calibrating = False
         self.tc = TravelCalculator(self._travel_time_down, self._travel_time_up)
 
     async def async_added_to_hass(self):
@@ -159,16 +160,25 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         if not self.available:
             return
         self.stop_auto_updater()
-        await self._async_handle_command(SERVICE_OPEN_COVER)
+        self.is_calibrating = True
+        try:
+            await self._async_handle_command(SERVICE_OPEN_COVER)
 
-        await asyncio.sleep(self._travel_time_up)
-        self.tc.set_position(self.tc.position_closed)
+            await asyncio.sleep(self._travel_time_up)
+            self.tc.set_position(self.tc.position_closed)
+
+        finally:
+            self.is_calibrating = False
 
         await self._async_handle_command(SERVICE_STOP_COVER)
 
     async def _handle_state_changed(self, event):
         """Process changes in Home Assistant, look if switch is opened
         manually."""
+        if self.is_calibrating:
+            # ignore all evnts while we're calibrating
+            return
+
         # If switch/light is not the target, skip
         if event.data.get(ATTR_ENTITY_ID) not in [
             self._close_switch_entity_id,
@@ -403,6 +413,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
 
     async def auto_stop_if_necessary(self):
         """Do auto stop if necessary."""
+        if self.is_calibrating:
+            # don't stop while we're calibrating
+            return
         if self.position_reached():
             _LOGGER.debug("auto_stop_if_necessary :: calling stop command")
             await self._async_handle_command(SERVICE_STOP_COVER)
