@@ -6,6 +6,7 @@ import logging
 
 import voluptuous as vol
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
+from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
 from homeassistant.components.homeassistant import exposed_entities
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITY_ID
@@ -97,7 +98,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     device_id = async_add_to_device(hass, entry, entity_id)
 
-    await hass.config_entries.async_forward_entry_setups(entry, (COVER_DOMAIN,))
+    await hass.config_entries.async_forward_entry_setups(entry, (COVER_DOMAIN, BUTTON_DOMAIN))
     return True
 
 
@@ -108,7 +109,7 @@ async def config_entry_update_listener(hass: HomeAssistant, entry: ConfigEntry) 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, (COVER_DOMAIN,))
+    return await hass.config_entries.async_unload_platforms(entry, (COVER_DOMAIN, BUTTON_DOMAIN))
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
