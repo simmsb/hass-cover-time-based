@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-import asyncio
 
 from homeassistant.components.cover import ATTR_CURRENT_POSITION
 from homeassistant.components.cover import ATTR_POSITION
 from homeassistant.components.cover import CoverEntity
-from homeassistant.components.button import ButtonEntity
+from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
@@ -71,7 +70,6 @@ def generate_unique_id(name: str) -> str:
     unique_id = slugify(entity)
     return unique_id
 
-
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -103,43 +101,8 @@ async def async_setup_entry(
         entity_down,
         entity_stop,
     )
-    button = CalibrateButton(
-        f"{cover_id}_button",
-        f"{config_entry.title} calibrate",
-        config_entry.options[CONF_TIME_OPEN],
-        cover,
-    )
 
-    async_add_entities([cover, button])
-
-
-class CalibrateButton(ButtonEntity):
-    def __init__(
-        self,
-        unique_id,
-        name,
-        travel_time_up,
-        cover,
-    ):
-        self._name = name
-        self._attr_unique_id = unique_id
-        self._travel_time_up = travel_time_up
-        self.cover = cover
-
-    async def async_press(self):
-        """Use the open entity for a while then assume the cover is fully open."""
-        _LOGGER.debug("do_calibrate")
-        await self.cover.check_availability()
-        if not self.cover.available:
-            return
-        self.cover.stop_auto_updater()
-        await self.cover._async_handle_command(SERVICE_OPEN_COVER)
-
-        await asyncio.sleep(self._travel_time_up)
-        self.cover.tc.set_position(self.cover.tc.position_open)
-
-        await self.cover._async_handle_command(SERVICE_STOP_COVER)
-
+    async_add_entities([cover])
 
 class CoverTimeBased(CoverEntity, RestoreEntity):
     def __init__(
