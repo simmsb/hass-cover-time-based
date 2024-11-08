@@ -126,6 +126,9 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     except vol.Invalid:
         # The source entity has been removed from the entity registry
         return
+    except KeyError:
+        _LOGGER.debug("huh: %s", entry)
+        return
 
     if not (switch_entity_entry := registry.async_get(switch_entity_id)):
         return
