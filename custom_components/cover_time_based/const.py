@@ -1,4 +1,5 @@
 """Constants for the Cover Time-based integration."""
+
 from typing import Final
 
 DOMAIN: Final = "cover_time_based"
