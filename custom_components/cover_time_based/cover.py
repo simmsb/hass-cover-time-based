@@ -9,6 +9,7 @@ import asyncio
 from homeassistant.components.cover import ATTR_CURRENT_POSITION
 from homeassistant.components.cover import ATTR_POSITION
 from homeassistant.components.cover import CoverEntity
+from homeassistant.components.button import ButtonEntity
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
