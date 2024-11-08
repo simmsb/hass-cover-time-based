@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
+import asyncio
 
 from homeassistant.components.cover import ATTR_CURRENT_POSITION
 from homeassistant.components.cover import ATTR_POSITION
@@ -35,6 +36,7 @@ from .const import CONF_ENTITY_STOP
 from .const import CONF_ENTITY_UP
 from .const import CONF_TIME_CLOSE
 from .const import CONF_TIME_OPEN
+from .const import SERVICE_CALIBRATE
 from .travelcalculator import TravelCalculator
 from .travelcalculator import TravelStatus
 
@@ -77,6 +79,8 @@ async def async_setup_entry(
     """Initialize Cover Switch config entry."""
     registry = er.async_get(hass)
 
+    platform = entity_platform.async_get_current_platform()
+
     entity_up = er.async_validate_entity_id(
         registry, config_entry.options[CONF_ENTITY_UP]
     )
@@ -101,6 +105,12 @@ async def async_setup_entry(
                 entity_stop,
             )
         ]
+    )
+
+    platform.async_register_entity_service(
+        SERVICE_CALIBRATE,
+        None,
+        "do_calibrate",
     )
 
 
@@ -132,6 +142,20 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         self._unsubscribe_auto_updater = None
 
         self.tc = TravelCalculator(self._travel_time_down, self._travel_time_up)
+
+    async def async_do_calibrate(self):
+        """Use the open entity for a while then assume the cover is fully open."""
+        _LOGGER.debug("do_calibrate")
+        await self.check_availability()
+        if not self.available:
+            return
+        self.stop_auto_updater()
+        await self._async_handle_command(SERVICE_OPEN_COVER)
+
+        await asyncio.sleep(self._travel_time_up)
+        self.tc.set_position(self.tc.position_open)
+
+        await self._async_handle_command(SERVICE_STOP_COVER)
 
     async def async_added_to_hass(self):
         """Only cover's position matters."""

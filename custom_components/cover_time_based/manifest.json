@@ -2,12 +2,12 @@
   "domain": "cover_time_based",
   "name": "Switch to Time-based Cover",
   "codeowners": [
-    "@duhow"
+    "@simmsb"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/duhow/hass-cover-time-based/tree/main",
+  "documentation": "https://github.com/simmsb/hass-cover-time-based/tree/main",
   "integration_type": "helper",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/duhow/hass-cover-time-based/issues",
+  "issue_tracker": "https://github.com/simmsb/hass-cover-time-based/issues",
   "version": "0.2.0"
 }
