@@ -23,7 +23,6 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_platform
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
@@ -80,8 +79,6 @@ async def async_setup_entry(
     """Initialize Cover Switch config entry."""
     registry = er.async_get(hass)
 
-    platform = entity_platform.async_get_current_platform()
-
     entity_up = er.async_validate_entity_id(
         registry, config_entry.options[CONF_ENTITY_UP]
     )
@@ -94,25 +91,52 @@ async def async_setup_entry(
             registry, config_entry.options[CONF_ENTITY_STOP]
         )
 
-    async_add_entities(
-        [
-            CoverTimeBased(
-                generate_unique_id(config_entry.title),
-                config_entry.title,
-                config_entry.options.get(CONF_TIME_CLOSE),
-                config_entry.options[CONF_TIME_OPEN],
-                entity_up,
-                entity_down,
-                entity_stop,
-            )
-        ]
+    cover_id = generate_unique_id(config_entry.title)
+
+    cover = CoverTimeBased(
+        cover_id,
+        config_entry.title,
+        config_entry.options.get(CONF_TIME_CLOSE),
+        config_entry.options[CONF_TIME_OPEN],
+        entity_up,
+        entity_down,
+        entity_stop,
+    )
+    button = CalibrateButton(
+        f"{cover_id}_button",
+        f"{config_entry.title} calibrate",
+        config_entry.options[CONF_TIME_OPEN],
     )
 
-    platform.async_register_entity_service(
-        SERVICE_CALIBRATE,
-        None,
-        "do_calibrate",
-    )
+    async_add_entities([cover, button])
+
+
+class CalibrateButton(ButtonEntity):
+    def __init__(
+        self,
+        unique_id,
+        name,
+        travel_time_up,
+        cover,
+    ):
+        self._name = name
+        self._attr_unique_id = unique_id
+        self._travel_time_up = travel_time_up
+        self.cover = cover
+
+    async def async_press(self):
+        """Use the open entity for a while then assume the cover is fully open."""
+        _LOGGER.debug("do_calibrate")
+        await self.cover.check_availability()
+        if not self.cover.available:
+            return
+        self.cover.stop_auto_updater()
+        await self.cover._async_handle_command(SERVICE_OPEN_COVER)
+
+        await asyncio.sleep(self._travel_time_up)
+        self.cover.tc.set_position(self.cover.tc.position_open)
+
+        await self.cover._async_handle_command(SERVICE_STOP_COVER)
 
 
 class CoverTimeBased(CoverEntity, RestoreEntity):
@@ -143,20 +167,6 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         self._unsubscribe_auto_updater = None
 
         self.tc = TravelCalculator(self._travel_time_down, self._travel_time_up)
-
-    async def async_do_calibrate(self):
-        """Use the open entity for a while then assume the cover is fully open."""
-        _LOGGER.debug("do_calibrate")
-        await self.check_availability()
-        if not self.available:
-            return
-        self.stop_auto_updater()
-        await self._async_handle_command(SERVICE_OPEN_COVER)
-
-        await asyncio.sleep(self._travel_time_up)
-        self.tc.set_position(self.tc.position_open)
-
-        await self._async_handle_command(SERVICE_STOP_COVER)
 
     async def async_added_to_hass(self):
         """Only cover's position matters."""
