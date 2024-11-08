@@ -162,7 +162,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         await self._async_handle_command(SERVICE_OPEN_COVER)
 
         await asyncio.sleep(self._travel_time_up)
-        self.tc.set_position(self.tc.position_open)
+        self.tc.set_position(self.tc.position_closed)
 
         await self._async_handle_command(SERVICE_STOP_COVER)
 
