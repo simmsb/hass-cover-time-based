@@ -8,14 +8,10 @@ import asyncio
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import SERVICE_OPEN_COVER
-from homeassistant.const import SERVICE_STOP_COVER
+from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import slugify
-
-from .const import CONF_TIME_OPEN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,18 +33,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Initialize Cover Switch calibrate config entry."""
-    registry = er.async_get(hass)
 
     cover_id = generate_unique_id(config_entry.title)
-
-    cover = er.async_validate_entity_id(
-        registry, cover_id
-    )
     button = CalibrateButton(
         generate_button_unique_id(config_entry.title),
         f"{config_entry.title} calibrate",
-        config_entry.options[CONF_TIME_OPEN],
-        cover,
+        cover_id,
     )
 
     async_add_entities([button])
@@ -61,25 +51,16 @@ class CalibrateButton(ButtonEntity):
         self,
         unique_id,
         name,
-        travel_time_up,
-        cover,
+        cover_id,
     ):
         self._name = name
         self._attr_unique_id = unique_id
-        self._travel_time_up = travel_time_up
-        self.cover = cover
+        self.cover_id = cover_id
 
     async def async_press(self):
         """Use the open entity for a while then assume the cover is fully open."""
-        _LOGGER.debug("do_calibrate")
-        await self.cover.check_availability()
-        if not self.cover.available:
-            return
-        self.cover.stop_auto_updater()
-        await self.cover._async_handle_command(SERVICE_OPEN_COVER)
+        _LOGGER.debug("do_calibrate press")
 
-        await asyncio.sleep(self._travel_time_up)
-        self.cover.tc.set_position(self.cover.tc.position_open)
-
-        await self.cover._async_handle_command(SERVICE_STOP_COVER)
-
+        self.hass.bus.async_fire("cover_time_based_calibrate", {
+            ATTR_ENTITY_ID: self.cover_id
+        })

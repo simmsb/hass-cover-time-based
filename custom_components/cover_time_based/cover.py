@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 
@@ -36,7 +37,6 @@ from .const import CONF_ENTITY_STOP
 from .const import CONF_ENTITY_UP
 from .const import CONF_TIME_CLOSE
 from .const import CONF_TIME_OPEN
-from .const import SERVICE_CALIBRATE
 from .travelcalculator import TravelCalculator
 from .travelcalculator import TravelStatus
 
@@ -138,6 +138,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         """The rest is calculated from this attribute."""
         # Listen to all change events, look for switch/light press
         self.hass.bus.async_listen(EVENT_STATE_CHANGED, self._handle_state_changed)
+        self.hass.bus.async_listen("cover_time_based_calibrate", self._do_calibrate)
         old_state = await self.async_get_last_state()
         _LOGGER.debug("async_added_to_hass :: oldState %s", old_state)
         if (
@@ -146,6 +147,24 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             and old_state.attributes.get(ATTR_CURRENT_POSITION) is not None
         ):
             self.tc.set_position(int(old_state.attributes.get(ATTR_CURRENT_POSITION)))
+
+    async def _do_calibrate(self, event):
+        """Use the open entity for a while then assume the cover is fully open."""
+
+        if event.data.get(ATTR_ENTITY_ID) != self._attr_unique_id:
+            return
+
+        _LOGGER.debug("do_calibrate")
+        await self.check_availability()
+        if not self.available:
+            return
+        self.stop_auto_updater()
+        await self._async_handle_command(SERVICE_OPEN_COVER)
+
+        await asyncio.sleep(self._travel_time_up)
+        self.tc.set_position(self.tc.position_open)
+
+        await self._async_handle_command(SERVICE_STOP_COVER)
 
     async def _handle_state_changed(self, event):
         """Process changes in Home Assistant, look if switch is opened
