@@ -107,7 +107,7 @@ async def async_setup_entry(
     async_add_entities([cover])
 
 def not_calibrating(func):
-    @wraps
+    @wraps(func)
     async def inner(self, *args, **kwargs):
         if self.is_calibrating:
            raise ServiceValidationError("Currently calibrating")
