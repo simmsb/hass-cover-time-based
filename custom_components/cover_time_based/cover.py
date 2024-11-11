@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import timedelta
+from functools import wraps
 
 from homeassistant.components.cover import ATTR_CURRENT_POSITION
 from homeassistant.components.cover import ATTR_POSITION
@@ -31,6 +32,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import slugify
+from homeassistant.exceptions import ServiceValidationError
 
 from .const import CONF_ENTITY_DOWN
 from .const import CONF_ENTITY_STOP
@@ -104,6 +106,15 @@ async def async_setup_entry(
 
     async_add_entities([cover])
 
+def not_calibrating(func):
+    @wraps
+    async def inner(self, *args, **kwargs):
+        if self.is_calibrating:
+           raise ServiceValidationError("Currently calibrating")
+
+        return await func(self, *args, **kwargs)
+    return inner
+
 class CoverTimeBased(CoverEntity, RestoreEntity):
     def __init__(
         self,
@@ -149,6 +160,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         ):
             self.tc.set_position(int(old_state.attributes.get(ATTR_CURRENT_POSITION)))
 
+    @not_calibrating
     async def _do_calibrate(self, event):
         """Use the open entity for a while then assume the cover is fully open."""
 
@@ -164,7 +176,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         try:
             await self._async_handle_command(SERVICE_OPEN_COVER)
 
-            await asyncio.sleep(self._travel_time_up)
+            await asyncio.sleep(self._travel_time_up * 1.5)
             self.tc.set_position(self.tc.position_closed)
 
         finally:
@@ -251,6 +263,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         ):
             await self.async_close_cover(handle_command=False)
 
+    @not_calibrating
     def _handle_my_button(self):
         """Handle the MY button press."""
         if self.tc.is_traveling():
@@ -318,6 +331,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
                 return
         self._attr_available = True
 
+    @not_calibrating
     async def async_set_cover_position(self, **kwargs):
         """Move the cover to a specific position."""
         if ATTR_POSITION in kwargs:
@@ -328,6 +342,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             _LOGGER.debug("async_set_cover_position: %d", position)
             await self.set_position(position)
 
+    @not_calibrating
     async def async_close_cover(self, **kwargs):
         """Turn the device close."""
         _LOGGER.debug("async_close_cover")
@@ -339,6 +354,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         self.tc.start_travel_up()
         self.start_auto_updater()
 
+    @not_calibrating
     async def async_open_cover(self, **kwargs):
         """Turn the device open."""
         _LOGGER.debug("async_open_cover")
@@ -350,6 +366,7 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
         self.tc.start_travel_down()
         self.start_auto_updater()
 
+    @not_calibrating
     async def async_stop_cover(self, **kwargs):
         """Turn the device stop."""
         _LOGGER.debug("async_stop_cover")

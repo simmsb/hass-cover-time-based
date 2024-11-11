@@ -37,7 +37,6 @@ async def async_setup_entry(
     cover_id = generate_unique_id(config_entry.title)
     button = CalibrateButton(
         generate_button_unique_id(config_entry.title),
-        f"{config_entry.title} calibrate",
         cover_id,
     )
 
@@ -50,10 +49,9 @@ class CalibrateButton(ButtonEntity):
     def __init__(
         self,
         unique_id,
-        name,
         cover_id,
     ):
-        self._name = name
+        self._name = "Calibrate"
         self._attr_unique_id = unique_id
         self.cover_id = cover_id
 
