@@ -10,7 +10,6 @@ from functools import wraps
 from homeassistant.components.cover import ATTR_CURRENT_POSITION
 from homeassistant.components.cover import ATTR_POSITION
 from homeassistant.components.cover import CoverEntity
-from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
@@ -107,13 +106,22 @@ async def async_setup_entry(
     async_add_entities([cover])
 
 def not_calibrating(func):
-    @wraps(func)
-    async def inner(self, *args, **kwargs):
-        if self.is_calibrating:
-           raise ServiceValidationError("Currently calibrating")
+    if asyncio.iscoroutinefunction(func):
+        @wraps(func)
+        async def inner_coro(self, *args, **kwargs):
+            if self.is_calibrating:
+                raise ServiceValidationError("Currently calibrating")
 
-        return await func(self, *args, **kwargs)
-    return inner
+            return await func(self, *args, **kwargs)
+        return inner_coro
+    else:
+        @wraps(func)
+        def inner(self, *args, **kwargs):
+            if self.is_calibrating:
+                raise ServiceValidationError("Currently calibrating")
+
+            return func(self, *args, **kwargs)
+        return inner
 
 class CoverTimeBased(CoverEntity, RestoreEntity):
     def __init__(
