@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import asyncio
 import logging
 from datetime import timedelta
@@ -150,6 +151,8 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
 
         self._unsubscribe_auto_updater = None
 
+        self._ignore_switch_updates_until = None
+
         self.is_calibrating = False
         self.tc = TravelCalculator(self._travel_time_down, self._travel_time_up)
 
@@ -247,6 +250,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
                 self._close_switch_state == STATE_UNAVAILABLE,
             ]
         )
+
+        if self._ignore_switch_updates_until is not None and time.time() < self._ignore_switch_updates_until:
+            return
 
         # Handle new status
         if (
@@ -403,6 +409,10 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
             self.start_auto_updater()
             self.tc.start_travel(position)
             _LOGGER.debug("set_position :: command %s", command)
+            # ignore async updates for a second. this prevents a switch change
+            # event triggering a full close/open when we wanted to set a
+            # position.
+            self._ignore_switch_updates_until = time.time() + 1
         return
 
     def start_auto_updater(self):
