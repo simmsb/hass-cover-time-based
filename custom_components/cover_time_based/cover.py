@@ -418,7 +418,9 @@ class CoverTimeBased(CoverEntity, RestoreEntity):
     @callback
     def auto_updater_hook(self, now):
         """Call for the autoupdater."""
-        _LOGGER.debug("auto_updater_hook")
+        current_position = self.tc.current_position()
+        travel_to = self.tc._travel_to_position
+        _LOGGER.debug("auto_updater_hook :: current_position: %d, travel_to: %d", current_position, travel_to)
         self.async_schedule_update_ha_state()
         if self.position_reached():
             _LOGGER.debug("auto_updater_hook :: position_reached")

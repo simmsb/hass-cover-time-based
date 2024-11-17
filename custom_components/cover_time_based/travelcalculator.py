@@ -127,18 +127,7 @@ class TravelCalculator:
 
     def position_reached(self) -> bool:
         """Return if cover has reached designated position."""
-        position = self.current_position()
-        travel_to = self._travel_to_position
-
-        if position is None or travel_to is None:
-            return False
-
-        if self.travel_direction == TravelStatus.DIRECTION_DOWN:
-            return position >= travel_to
-        elif self.travel_direction == TravelStatus.DIRECTION_UP:
-            return position <= travel_to
-        else:
-            return position == travel_to
+        return self.current_position() == self._travel_to_position
 
     def is_open(self) -> bool:
         """Return if cover is (fully) open."""
