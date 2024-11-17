@@ -15,9 +15,11 @@ E.g.:
 
 from __future__ import annotations
 
+import logging
 import time
 from enum import Enum
 
+_LOGGER = logging.getLogger(__name__)
 
 class TravelStatus(Enum):
     """Enum class for travel status."""
@@ -59,11 +61,13 @@ class TravelCalculator:
 
     def set_position(self, position: int) -> None:
         """Set position and target of cover."""
+        _LOGGER.debug("set_position :: position: %d", position)
         self._travel_to_position = position
         self.update_position(position)
 
     def update_position(self, position: int) -> None:
         """Update known position of cover."""
+        _LOGGER.debug("update_position :: position: %d", position)
         self._last_known_position = position
         self._last_known_position_timestamp = time.time()
         if position == self._travel_to_position:
@@ -72,6 +76,7 @@ class TravelCalculator:
     def stop(self) -> None:
         """Stop traveling."""
         stop_position = self.current_position()
+        _LOGGER.debug("stop :: stop_position: %d", stop_position)
         if stop_position is None:
             return
         self._last_known_position = stop_position
@@ -81,6 +86,7 @@ class TravelCalculator:
 
     def start_travel(self, _travel_to_position: int) -> None:
         """Start traveling to position."""
+        _LOGGER.debug("start_travel :: travel_to_position: %d", _travel_to_position)
         if self._last_known_position is None:
             self.set_position(_travel_to_position)
             return
@@ -97,10 +103,12 @@ class TravelCalculator:
 
     def start_travel_up(self) -> None:
         """Start traveling up."""
+        _LOGGER.debug("start_travel_up")
         self.start_travel(self.position_open)
 
     def start_travel_down(self) -> None:
         """Start traveling down."""
+        _LOGGER.debug("start_travel_down")
         self.start_travel(self.position_closed)
 
     def current_position(self) -> int | None:
